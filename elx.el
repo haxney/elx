@@ -127,21 +127,31 @@ elpa archive, and archive type).
 
 (defmacro elx-with-file (file &rest body)
   "Execute BODY in a buffer containing the contents of FILE.
+
 If FILE is nil or equal to `buffer-file-name' execute BODY in the
-current buffer.  Move to beginning of buffer before executing BODY."
+current buffer. If FILE is a buffer, execute body in that buffer.
+
+Move to beginning of buffer before executing BODY."
   (declare (indent 1) (debug t))
   (let ((filesym (gensym "file")))
     `(let ((,filesym ,file))
-       (if (and ,filesym (not (equal ,filesym buffer-file-name)))
-	   (with-temp-buffer
-	     (insert-file-contents ,filesym)
-	     (with-syntax-table emacs-lisp-mode-syntax-table
-	       (goto-char (point-min))
-	       ,@body))
-	 (save-excursion
-	   (with-syntax-table emacs-lisp-mode-syntax-table
-	     (goto-char (point-min))
-	     ,@body))))))
+       (cond
+        ((and ,filesym (stringp ,filesym) (not (equal ,filesym buffer-file-name)))
+         (with-temp-buffer
+           (insert-file-contents ,filesym)
+           (with-syntax-table emacs-lisp-mode-syntax-table
+             (goto-char (point-min))
+             ,@body)))
+        ((or (bufferp ,filesym) (get-buffer ,filesym))
+         (save-excursion
+           (with-current-buffer ,filesym
+             (with-syntax-table emacs-lisp-mode-syntax-table
+               (goto-char (point-min))
+               ,@body))))
+        (save-excursion
+          (with-syntax-table emacs-lisp-mode-syntax-table
+            (goto-char (point-min))
+            ,@body))))))
 
 ;; This is almost identical to `lm-header-multiline' and will be merged
 ;; into that function.
