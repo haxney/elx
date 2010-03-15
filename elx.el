@@ -142,16 +142,17 @@ Move to beginning of buffer before executing BODY."
            (with-syntax-table emacs-lisp-mode-syntax-table
              (goto-char (point-min))
              ,@body)))
-        ((or (bufferp ,filesym) (get-buffer ,filesym))
+        ((and (bufferp ,filesym) (get-buffer ,filesym))
          (save-excursion
            (with-current-buffer ,filesym
              (with-syntax-table emacs-lisp-mode-syntax-table
                (goto-char (point-min))
                ,@body))))
-        (save-excursion
-          (with-syntax-table emacs-lisp-mode-syntax-table
-            (goto-char (point-min))
-            ,@body))))))
+        (t
+         (save-excursion
+           (with-syntax-table emacs-lisp-mode-syntax-table
+             (goto-char (point-min))
+             ,@body)))))))
 
 ;; This is almost identical to `lm-header-multiline' and will be merged
 ;; into that function.
@@ -305,9 +306,10 @@ the pages.  If it is not specified or nil the value of function
 `elx-wiki-directory' is used.  If optional URLP is specified and
 non-nil return the url of the page otherwise only the name.
 
-The page is determined by comparing the name of FILE with existing pages.
-So their is no garanty that this will always return the page about a
-package, even if it exists.  False-positives might also occur."
+The page is determined by comparing the name of FILE with
+existing pages. So their is no guarantee that this will always
+return the page about a package, even if it exists.
+False-positives might also occur."
   (or (elx-with-file file
 	(elx-header "\\(?:x-\\)?\\(?:emacs\\)?wiki-?page"))
       (let ((page (upcase-initials
@@ -315,8 +317,9 @@ package, even if it exists.  False-positives might also occur."
 		    (replace-regexp-in-string "-."
 		     (lambda (str)
 		       (upcase (substring str 1)))
-		     (file-name-sans-extension
-		      (file-name-nondirectory file)))))))
+		     (or (and (stringp file) (file-name-sans-extension
+                   (file-name-nondirectory file)))
+                 (buffer-name (get-buffer file))))))))
 	(when (member page (if (consp pages)
                            pages
                          (let ((dirname (or pages elx-wiki-directory)))
@@ -874,9 +877,9 @@ The regexp being used is stored in variable `elx-provided-regexp'."
                ;; TODO: This is a basic hack to avoid symlink loops, a more
                ;; sophisticated version would use `file-truename' and keep track
                ;; of previously-visited files and directories.
-               ((file-symlink-p source)
+               ((and (stringp source) (file-symlink-p source))
                 nil)
-	       ((file-directory-p source)
+	       ((and (stringp source) (file-directory-p source))
 		(mapcan (lambda (elt)
 			  (when (or (file-directory-p elt)
 				    (string-match "\\.el\\(.gz\\)?$" elt))
@@ -984,7 +987,7 @@ The regexp being used is stored in variable `elx-required-regexp'."
 	  (mapcan (lambda (elt)
 		    (elx-required elt provided))
 		  source))
-	 ((file-directory-p source)
+	 ((and (stringp source) (file-directory-p source))
 	  (mapcan (lambda (source)
 		    (when (or (file-directory-p source)
 			      (string-match "\\.el$" source))
@@ -1125,13 +1128,15 @@ through SOURCE.
 \(fn SOURCE [MAINFILE] [PREV])"
   (unless mainfile
     (setq mainfile
-	  (if (file-directory-p source)
+	  (if (and (stringp source) (file-directory-p source))
 	      (elx-package-mainfile source t)
 	    source)))
-  (if mainfile
-      (unless (file-name-absolute-p mainfile)
-	(setq mainfile (concat source mainfile)))
-    (error "The mainfile can not be determined"))
+  (cond
+   ((and mainfile (stringp mainfile) (not (file-name-absolute-p mainfile)))
+    (setq mainfile (concat source mainfile)))
+   ((bufferp mainfile))
+   (t
+    (error "The mainfile can not be determined")))
   (let* ((provided (elx-provided source))
          (required (elx-required-packages source provided))
          (version-raw (elx-version mainfile))
