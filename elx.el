@@ -129,7 +129,8 @@ elpa archive, and archive type).
   "Execute BODY in a buffer containing the contents of FILE.
 
 If FILE is nil or equal to `buffer-file-name' execute BODY in the
-current buffer. If FILE is a buffer, execute body in that buffer.
+current buffer. If FILE is a buffer or the name of a buffer,
+execute body in that buffer.
 
 Move to beginning of buffer before executing BODY."
   (declare (indent 1) (debug t))
@@ -142,7 +143,7 @@ Move to beginning of buffer before executing BODY."
            (with-syntax-table emacs-lisp-mode-syntax-table
              (goto-char (point-min))
              ,@body)))
-        ((and (bufferp ,filesym) (get-buffer ,filesym))
+        ((buffer-live-p (get-buffer ,filesym))
          (save-excursion
            (with-current-buffer ,filesym
              (with-syntax-table emacs-lisp-mode-syntax-table
@@ -1164,7 +1165,7 @@ through SOURCE.
   (cond
    ((and mainfile (stringp mainfile) (not (file-name-absolute-p mainfile)))
     (setq mainfile (concat source mainfile)))
-   ((bufferp mainfile))
+   ((buffer-live-p mainfile))
    (t
     (error "The mainfile can not be determined")))
   (let* ((provided (elx-provided source))
