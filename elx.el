@@ -1192,27 +1192,8 @@ through SOURCE.
                           :commentary (elx-commentary mainfile)))
       (cl-merge-struct 'elx-pkg prev meta))))
 
-(defun elx-pp-pkg (pkg)
-  "Return the pretty-printed representation of PKG.
-
-PKG must be a `elx-pkg' structure."
-  (with-temp-buffer
-    (let ((standard-output (current-buffer)))
-      (princ "(")
-      (princ (mapconcat '(lambda (item)
-                           (concat (car item) " " (prin1-to-string (cadr item))))
-                        (delq nil (cl-merge-mapslots '(lambda (slot slot-func val)
-                                                        (when val
-                                                          (list (concat ":" (symbol-name slot))
-                                                                val)))
-                                                     'elx-pkg
-                                                     pkg)) "\n"))
-      (princ ")\n"))
-    (indent-region (1+ (point-min)) (point-max) 1)
-    (buffer-string)))
-
 (defun elx-read-file (source)
-  "Read `elx-pkg' data, as output by `elx-pp-pkg'.
+  "Read `elx-pkg' data, as output by `cl-merge-pp'.
 
 SOURCE is the file to read. Returns a `elx-pkg' structure if
 successful."
