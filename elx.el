@@ -829,7 +829,7 @@ The return value has the form (NAME . ADDRESS)."
 (defvar elx-known-features nil
   "List of known features.
 Each element is a cons cell whose car is a feature symbol and whose cdr is
-the providing package, a string.  You are responsible to setup the value
+the providing package, a symbol.  You are responsible to setup the value
 yourself.  This variable may be used in function `elx-required-packages'.")
 
 (defvar elx-missing-features nil
@@ -1005,8 +1005,8 @@ The returned value has the form:
   (((HARD-REQUIRED-PACKAGE FEATURE...)...)
    [((SOFT-REQUIRED-PACKAGE FEATURE...)...)])
 
-Where HARD-REQUIRED-PACKAGE and SOFT-REQUIRED-PACKAGE are strings and
-FEATURE is a symbol.  If no features/packages are required nil is
+Where HARD-REQUIRED-PACKAGE, SOFT-REQUIRED-PACKAGE, and FEATURE
+are symbols. If no features/packages are required nil is
 returned.
 
 SOURCE has to be a file, directory, list of files and/or directories or
@@ -1030,7 +1030,7 @@ in the return value.
 If optional KNOWN is provided and non-nil it has to be an alist or
 hash table mapping features to packages.  If it is omitted or nil the
 value of variable `elx-known-features' is used, however you have to setup
-the value of its your self.
+the value of its yourself.
 
 INCLUDE and EXCLUDE are useful when you know that the value returned by
 the function (usually `elx-required') used to extract the list of required
