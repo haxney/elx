@@ -556,7 +556,7 @@ Each element has the following form:
 Where NUM is the negative integer returned by `version-to-list'
 and STR is the string to which to decode that number.")
 
-(defun exl-version-canonical (version)
+(defun elx-version-canonical (version)
   "Returns a canonical string representation of the version list VERSION.
 
 Uses `elx-version-canonical-mapping' to decode negative integers
