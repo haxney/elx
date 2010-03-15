@@ -1066,6 +1066,36 @@ The regexp being used is stored in variable `elx-required-regexp'."
 			    (nth 1 include)
 			    (nth 1 exclude))))))
 
+(defun elx-required-packages-only (pkg &optional type)
+  "Return a list of the required packages of PKG.
+
+Unlike `elx-required-packages', this returns only a list of the
+package names, and not the features within those packages that
+are required.
+
+TYPE determines which kind of required packages are returned:
+hard, soft, or both. Its behavior is as follows:
+
+ * nil or 'both: Return a merged list of both hard and soft
+   requirements.
+
+ * 'hard: Return a list of only the hard requirements.
+
+ * 'soft: Return a list of only the soft requirements."
+  (let* ((hard (elx-requires-hard pkg))
+         (hard-list (mapcar 'car hard))
+         (soft (elx-requires-soft pkg))
+         (soft-list (mapcar 'car soft)))
+    (cond
+     ((or (null type) (eq type 'both))
+      (append hard-list soft-list))
+     ((eq type 'hard)
+      hard-list)
+     ((eq type 'soft)
+      soft-list)
+     (t
+      (error "TYPE must be 'hard, 'soft, 'both, or nil; '%s' received" type)))))
+
 ;;; Extract Complete Metadata.
 
 (defun elx--lisp-files (directory &optional full)
