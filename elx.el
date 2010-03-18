@@ -1135,6 +1135,7 @@ through SOURCE.
   (cond
    ((and mainfile (stringp mainfile) (not (file-name-absolute-p mainfile)))
     (setq mainfile (concat source mainfile)))
+   ((and mainfile (stringp mainfile) (file-readable-p mainfile)))
    ((buffer-live-p mainfile))
    (t
     (error "The mainfile can not be determined")))
@@ -1148,12 +1149,12 @@ through SOURCE.
       (setq meta
             (make-elx-pkg :version version
                           :version-raw version-raw
-                          :summary (elx-summary nil t)
+                          :summary (elx-summary mainfile t)
                           :created (elx-created mainfile)
                           :updated (elx-updated mainfile)
-                          :license (elx-license)
-                          :authors (elx-authors)
-                          :maintainer (elx-maintainer)
+                          :license (elx-license mainfile)
+                          :authors (elx-authors mainfile)
+                          :maintainer (elx-maintainer mainfile)
                           :provides provided
                           :requires-hard (nth 0 required)
                           :requires-soft (nth 1 required)
