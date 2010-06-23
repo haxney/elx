@@ -65,21 +65,33 @@
 
 (defmacro elx-with-file (file &rest body)
   "Execute BODY in a buffer containing the contents of FILE.
+
 If FILE is nil or equal to `buffer-file-name' execute BODY in the
-current buffer.  Move to beginning of buffer before executing BODY."
+current buffer. If FILE is a buffer or the name of a buffer,
+execute body in that buffer.
+
+Move to beginning of buffer before executing BODY."
   (declare (indent 1) (debug t))
   (let ((filesym (gensym "file")))
     `(let ((,filesym ,file))
-       (if (and ,filesym (not (equal ,filesym buffer-file-name)))
-	   (with-temp-buffer
-	     (insert-file-contents ,filesym)
-	     (with-syntax-table emacs-lisp-mode-syntax-table
-	       (goto-char (point-min))
-	       ,@body))
-	 (save-excursion
-	   (with-syntax-table emacs-lisp-mode-syntax-table
-	     (goto-char (point-min))
-	     ,@body))))))
+       (cond
+        ((and ,filesym (stringp ,filesym) (not (equal ,filesym buffer-file-name)))
+         (with-temp-buffer
+           (insert-file-contents ,filesym)
+           (with-syntax-table emacs-lisp-mode-syntax-table
+             (goto-char (point-min))
+             ,@body)))
+        ((and ,filesym (buffer-live-p (get-buffer ,filesym)))
+         (save-excursion
+           (with-current-buffer ,filesym
+             (with-syntax-table emacs-lisp-mode-syntax-table
+               (goto-char (point-min))
+               ,@body))))
+        (t
+         (save-excursion
+           (with-syntax-table emacs-lisp-mode-syntax-table
+             (goto-char (point-min))
+             ,@body)))))))
 
 ;; This is almost identical to `lm-header-multiline' and will be merged
 ;; into that function.
@@ -493,6 +505,52 @@ If no matching entry exists return nil."
 		   "[-:]version \"\\([-_.0-9a-z]+\\)\"")
 	   (lm-code-mark) t)
       (match-string-no-properties 2))))
+
+(defconst elx-version-canonical-mapping '((-3 . "alpha")
+                                          (-2 . "beta")
+                                          (-1 . "rc"))
+  "Mapping used for translating negative version numbers to strings.
+
+The list returned by `version-to-list' can contain negative
+numbers, which represent non-numeric components in the original,
+string-based version. These must be translated back to strings,
+but in a way such that the operation is fully reversible. This
+constant contains a mapping of negative integers and the string
+to which to decode them.
+
+Each element has the following form:
+
+    (NUM . STR)
+
+Where NUM is the negative integer returned by `version-to-list'
+and STR is the string to which to decode that number.")
+
+(defun elx-version-canonical (version)
+  "Returns a canonical string representation of the version list VERSION.
+
+Uses `elx-version-canonical-mapping' to decode negative integers
+to their non-numeric representations. The string returned is
+itself parse-able by `version-to-list', and so is reversible.
+
+Since `version-to-list' uses the same priority for multiple
+different strings, sometimes different version can produce the
+same canonical string. For example:
+
+    (elx-version-canonical (version-to-list \"1rc1\"))
+      => \"1rc1\"
+
+    (elx-version-canonical (version-to-list \"1pre1\"))
+      => \"1rc1\""
+  (unless (listp version)
+    (error "VERSION must be an integer list"))
+  (let ((result (mapconcat '(lambda (part)
+                              (if (>= part 0)
+                                  (number-to-string part)
+                                (format "_%s_" (cdr (assq part elx-version-canonical-mapping)))))
+                           version ".")))
+    ;; This is an ugly hack, but it is an easy way of preventing (1 -1 1) from
+    ;; becoming "1.rc.1", which `version-to-list' cannot parse.
+    (replace-regexp-in-string "_\\.\\|\\._" "" result)))
 
 (defun elx-version--do-standardize (version)
   "Standardize common version names such as \"alpha\" or \"v1.0\".
