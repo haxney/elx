@@ -94,7 +94,7 @@ elpa archive, and archive type).
  - PROVIDES: Features provided by this package.
 
  - REQUIRES-HARD: The packages hard-required by this package, as
-   a list of ((REQ-NAME . REQ-VERSION) features...) lists, where
+   a list of ((REQ-NAME . REQ-VERSION) FEATURES...) lists, where
    REQ-NAME is a symbol and REQ-VERSION is a parsed version
    string.
 
@@ -143,7 +143,7 @@ Move to beginning of buffer before executing BODY."
            (with-syntax-table emacs-lisp-mode-syntax-table
              (goto-char (point-min))
              ,@body)))
-        ((buffer-live-p (get-buffer ,filesym))
+        ((and ,filesym (buffer-live-p (get-buffer ,filesym)))
          (save-excursion
            (with-current-buffer ,filesym
              (with-syntax-table emacs-lisp-mode-syntax-table
