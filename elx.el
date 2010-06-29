@@ -70,6 +70,12 @@ If FILE is nil or equal to `buffer-file-name' execute BODY in the
 current buffer. If FILE is a buffer or the name of a buffer,
 execute body in that buffer.
 
+FILE may also be a list of the form (FILENAME REPO . REV), where
+FILENAME is the name of a file relative to the base of a git
+repository REPO. BODY is executed in a buffer containing the
+contents of FILENAME in the git repository REPO at revision REV.
+This is only available if the `lgit' library is present.
+
 Move to beginning of buffer before executing BODY."
   (declare (indent 1) (debug t))
   (let ((filesym (gensym "file")))
@@ -87,6 +93,11 @@ Move to beginning of buffer before executing BODY."
              (with-syntax-table emacs-lisp-mode-syntax-table
                (goto-char (point-min))
                ,@body))))
+        ((and ,filesym (consp ,filesym))
+         (let ((name (car ,filesym))
+               (repo (cadr ,filesym))
+               (rev (cddr ,filesym)))
+           (lgit-with-file repo rev file ,@body)))
         (t
          (save-excursion
            (with-syntax-table emacs-lisp-mode-syntax-table
