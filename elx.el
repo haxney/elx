@@ -1302,9 +1302,12 @@ the file name of a single file."
     ;; Return features.
     (list provided-repo required-hard required-soft)))
 
-(defun elx-package-metadata (name repo rev &optional branch)
-  (let ((features (elx-package-features name repo rev)))
-    (elx-with-mainfile (cons repo rev) nil
+;; TODO: Remove NAME argument, it shouldn't be handled by elx.
+(defun elx-package-metadata (name source &optional branch)
+  (let ((features (elx-package-features name source))
+        (repo (car-safe source))
+        (rev (cdr-safe source)))
+    (elx-with-mainfile source nil
       (let ((wikipage (elx-wikipage mainfile name nil t)))
 	(list :summary (elx-summary nil t)
 	      :created (elx-created mainfile)
@@ -1320,10 +1323,11 @@ the file name of a single file."
 			    (cdr features)))
 	      :keywords (elx-keywords mainfile t)
 	      :homepage (or (elx-homepage mainfile)
-			    (cadr (lgit repo 1 "config branch.%s.elm-webpage"
-					(or branch rev)))
-			    (when (equal (or branch rev) "emacswiki")
-			      wikipage))
+                        (when repo
+                          (cadr (lgit repo 1 "config branch.%s.elm-webpage"
+                                      (or branch rev)))
+                          (when (equal (or branch rev) "emacswiki")
+                            wikipage)))
 	      :wikipage wikipage
 	      :commentary (elx-commentary mainfile))))))
 
