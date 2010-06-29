@@ -1231,55 +1231,74 @@ an existing revision in that repository."
 (defun elx--git-get (repo variable)
   (mapcan #'split-string (cdr (lgit repo 1 "config --get-all %s" variable))))
 
-(defun elx-package-features (name repo rev &optional only-features)
-  (let (required required-hard required-soft
-	provided provided-repo bundled
-	(exclude (mapcar #'intern (elx--git-get repo "elm.exclude")))
-	(exclude-path (elx--git-get repo "elm.exclude-path")))
+;; TODO: Remove NAME from arguments, elx should not be dealing with packages.
+(defun elx-package-features (name source &optional only-features)
+  "Get the required and provided features of package NAME from SOURCE.
+
+NAME is the name of the package being examined, and SOURCE is the
+source from which to find the features. It has the same form as
+the SOURCE argument to `elx-elisp-files', although it may also be
+the file name of a single file."
+  (let (repo rev required required-hard required-soft
+                 provided provided-repo bundled
+                 git-src exclude exclude-path files)
+    (when (consp source)
+      (setq repo (car source)
+            rev (cdr source)
+            git-src (cons repo rev)
+            exclude (mapcar #'intern (elx--git-get repo "elm.exclude"))
+            exclude-path (elx--git-get repo "elm.exclude-path")))
+
     ;; Collect features.
-    (dolist (file (elx-elisp-files (cons repo rev)))
-      (lgit-with-file repo rev file
-	(setq provided (elx--buffer-provided)
-	      required (elx--buffer-required)))
+    (setq files
+          (if (or (file-directory-p source) git-src)
+              (elx-elisp-files source t)
+            (list source)))
+    (dolist (file files)
+      (elx-with-file (if git-src
+                         (cons file git-src)
+                       file)
+                     (setq provided (elx--buffer-provided)
+                           required (elx--buffer-required)))
       (dolist (prov provided)
-	(cond ((or (member  prov exclude)
-		   (member* file exclude-path
-			    :test (lambda (file path)
-				    (string-match path file))))
-	       (push prov bundled))
-	      (t
-	       (when prov
-		 (push prov provided-repo))
-	       (setq required-hard
-		     (nconc (copy-list (nth 0 required)) required-hard))
-	       (setq required-soft
-		     (nconc (copy-list (nth 1 required)) required-soft))))))
+        (cond ((or (member  prov exclude)
+                   (member* file exclude-path
+                            :test (lambda (file path)
+                                    (string-match path file))))
+               (push prov bundled))
+              (t
+               (when prov
+                 (push prov provided-repo))
+               (setq required-hard
+                     (nconc (copy-list (nth 0 required)) required-hard))
+               (setq required-soft
+                     (nconc (copy-list (nth 1 required)) required-soft))))))
     ;; Add provides to `elx-features-provided', check for conflicts.
     (dolist (prov provided-repo)
       (let ((elt (assoc prov elx-features-provided)))
-	(if elt
-	    (unless (equal (cdr elt) name)
-	      (elm-log "Feature %s provided by %s and %s"
-		       prov (cdr elt) name))
-	  (aput 'elx-features-provided prov name))))
+        (if elt
+            (unless (equal (cdr elt) name)
+              (elm-log "Feature %s provided by %s and %s"
+                       prov (cdr elt) name))
+          (aput 'elx-features-provided prov name))))
     ;; Cleanup features.  (sort, remove dups, remove xemacs specific deps)
     (setq provided-repo (elx--sanitize-provided   provided-repo t))
     (setq required-hard (elx--sanitize-required-1 required-hard
-						  provided-repo t))
+                                                  provided-repo t))
     (setq required-soft (elx--sanitize-required-1 required-soft
-						  (append provided-repo
-							  required-hard) t))
-    ;; Get packages providing dependecies.
+                                                  (append provided-repo
+                                                          required-hard) t))
+    ;; Get packages providing dependencies.
     (unless only-features
       (setq required-hard (elx--lookup-required required-hard))
       (setq required-soft (elx--lookup-required required-soft))
       ;; Report missing
       (dolist (dep (cdr (assoc nil required-hard)))
-	(unless (memq dep bundled)
-	  (message "%s: hard required %s not available" name dep)))
+        (unless (memq dep bundled)
+          (message "%s: hard required %s not available" name dep)))
       (dolist (dep (cdr (assoc nil required-soft)))
-	(unless (memq dep bundled)
-	  (message "%s: soft required %s not available" name dep))))
+        (unless (memq dep bundled)
+          (message "%s: soft required %s not available" name dep))))
     ;; Return features.
     (list provided-repo required-hard required-soft)))
 
