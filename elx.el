@@ -1197,10 +1197,11 @@ actually exists."
 If MAINFILE is non-nil use that as mainfile otherwise determine the
 mainfile by applying `elx-package-mainfile' to SOURCE.
 
-SOURCE has to be the mainfile itself (in which case it doesn't make much
-sense to specify MAINFILE also) or a directory containing a package
-consisting of one or more Emacs Lisp files.  This directory may also
-contain auxiliary files.
+SOURCE has to be the mainfile itself (in which case it doesn't
+make much sense to specify MAINFILE also) or a directory
+containing a package consisting of one or more Emacs Lisp files.
+This directory may also contain auxiliary files. If SOURCE is a
+buffer, then use that as the mainfile.
 
 If library `lgit' is loaded SOURCE can also be a cons cell whose car is
 the path to a git repository (which may be bare) and whose cdr has to be
@@ -1209,12 +1210,14 @@ an existing revision in that repository."
   `(let ((source ,source)
 	 (mainfile ,mainfile))
      (unless mainfile
-       (setq mainfile
-	     (if (file-directory-p (if (consp source)
-				       (car source)
-				     source))
-		 (elx-package-mainfile source t)
-	       source)))
+       (let* ((source-string (or (car-safe source) source)))
+         (setq mainfile
+               (cond
+                ((and (stringp source-string) (file-directory-p source-string))
+                 (elx-package-mainfile source t))
+                ((bufferp (get-buffer source))
+                 (buffer-file-name source))
+                (t source)))))
      (if mainfile
 	 (unless (or (consp source)
 		     (file-name-absolute-p mainfile))
@@ -1251,7 +1254,7 @@ the file name of a single file."
 
     ;; Collect features.
     (setq files
-          (if (or (file-directory-p source) git-src)
+          (if (or (and (stringp source) (file-directory-p source)) git-src)
               (elx-elisp-files source t)
             (list source)))
     (dolist (file files)
