@@ -813,7 +813,8 @@ The return value has the form (NAME . ADDRESS)."
 	(car (elx-authors))))))
 
 (defun elx-adapted-by (&optional file sanitize)
-  "Return the person how adapted file FILE.
+  "Return the person who adapted FILE.
+
 Or the current buffer if FILE is equal to `buffer-file-name' or is nil.
 The return value has the form (NAME . ADDRESS)."
   (elx-with-file file
