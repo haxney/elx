@@ -1314,28 +1314,28 @@ the file name of a single file."
         (rev (cdr-safe source)))
 
     (elx-with-mainfile source nil
-                       (let ((wikipage (elx-wikipage mainfile name nil t)))
-                         (list :summary (elx-summary nil t)
-                               :created (elx-created mainfile)
-                               :updated (elx-updated mainfile)
-                               :license (elx-license)
-                               :authors (elx-authors nil t)
-                               :maintainer (elx-maintainer nil t)
-                               :adapted-by (elx-adapted-by nil t)
-                               :provided (car elx-features)
-                               :required (unless (equal (cdr elx-features) '(nil nil))
-                                           (if (equal (cddr elx-features) '(nil))
-                                               (list (cadr elx-features))
-                                             (cdr elx-features)))
-                               :keywords (elx-keywords mainfile t)
-                               :homepage (or (elx-homepage mainfile)
-                                             (when repo
-                                               (cadr (lgit repo 1 "config branch.%s.elm-webpage"
-                                                           (or branch rev)))
-                                               (when (equal (or branch rev) "emacswiki")
-                                                 wikipage)))
-                               :wikipage wikipage
-                               :commentary (elx-commentary mainfile))))))
+      (let ((wikipage (elx-wikipage mainfile name nil t)))
+        (list :summary (elx-summary nil t)
+              :created (elx-created mainfile)
+              :updated (elx-updated mainfile)
+              :license (elx-license)
+              :authors (elx-authors nil t)
+              :maintainer (elx-maintainer nil t)
+              :adapted-by (elx-adapted-by nil t)
+              :provided (car elx-features)
+              :required (unless (equal (cdr elx-features) '(nil nil))
+                          (if (equal (cddr elx-features) '(nil))
+                              (list (cadr elx-features))
+                            (cdr elx-features)))
+              :keywords (elx-keywords mainfile t)
+              :homepage (or (elx-homepage mainfile)
+                            (when repo
+                              (cadr (lgit repo 1 "config branch.%s.elm-webpage"
+                                          (or branch rev)))
+                              (when (equal (or branch rev) "emacswiki")
+                                wikipage)))
+              :wikipage wikipage
+              :commentary (elx-commentary mainfile))))))
 
 (provide 'elx)
 ;;; elx.el ends here
