@@ -65,21 +65,44 @@
 
 (defmacro elx-with-file (file &rest body)
   "Execute BODY in a buffer containing the contents of FILE.
+
 If FILE is nil or equal to `buffer-file-name' execute BODY in the
-current buffer.  Move to beginning of buffer before executing BODY."
+current buffer. If FILE is a buffer or the name of a buffer,
+execute body in that buffer.
+
+FILE may also be a list of the form (FILENAME REPO . REV), where
+FILENAME is the name of a file relative to the base of a git
+repository REPO. BODY is executed in a buffer containing the
+contents of FILENAME in the git repository REPO at revision REV.
+This is only available if the `lgit' library is present.
+
+Move to beginning of buffer before executing BODY."
   (declare (indent 1) (debug t))
   (let ((filesym (gensym "file")))
     `(let ((,filesym ,file))
-       (if (and ,filesym (not (equal ,filesym buffer-file-name)))
-	   (with-temp-buffer
-	     (insert-file-contents ,filesym)
-	     (with-syntax-table emacs-lisp-mode-syntax-table
-	       (goto-char (point-min))
-	       ,@body))
-	 (save-excursion
-	   (with-syntax-table emacs-lisp-mode-syntax-table
-	     (goto-char (point-min))
-	     ,@body))))))
+       (cond
+        ((and ,filesym (stringp ,filesym) (not (equal ,filesym buffer-file-name)))
+         (with-temp-buffer
+           (insert-file-contents ,filesym)
+           (with-syntax-table emacs-lisp-mode-syntax-table
+             (goto-char (point-min))
+             ,@body)))
+        ((and ,filesym (buffer-live-p (get-buffer ,filesym)))
+         (save-excursion
+           (with-current-buffer ,filesym
+             (with-syntax-table emacs-lisp-mode-syntax-table
+               (goto-char (point-min))
+               ,@body))))
+        ((and ,filesym (consp ,filesym))
+         (let ((name (car ,filesym))
+               (repo (cadr ,filesym))
+               (rev (cddr ,filesym)))
+           (lgit-with-file repo rev file ,@body)))
+        (t
+         (save-excursion
+           (with-syntax-table emacs-lisp-mode-syntax-table
+             (goto-char (point-min))
+             ,@body)))))))
 
 ;; This is almost identical to `lm-header-multiline' and will be merged
 ;; into that function.
@@ -496,6 +519,52 @@ If no matching entry exists return nil."
 	   (lm-code-mark) t)
       (match-string-no-properties 2))))
 
+(defconst elx-version-canonical-mapping '((-3 . "alpha")
+                                          (-2 . "beta")
+                                          (-1 . "rc"))
+  "Mapping used for translating negative version numbers to strings.
+
+The list returned by `version-to-list' can contain negative
+numbers, which represent non-numeric components in the original,
+string-based version. These must be translated back to strings,
+but in a way such that the operation is fully reversible. This
+constant contains a mapping of negative integers and the string
+to which to decode them.
+
+Each element has the following form:
+
+    (NUM . STR)
+
+Where NUM is the negative integer returned by `version-to-list'
+and STR is the string to which to decode that number.")
+
+(defun elx-version-canonical (version)
+  "Returns a canonical string representation of the version list VERSION.
+
+Uses `elx-version-canonical-mapping' to decode negative integers
+to their non-numeric representations. The string returned is
+itself parse-able by `version-to-list', and so is reversible.
+
+Since `version-to-list' uses the same priority for multiple
+different strings, sometimes different version can produce the
+same canonical string. For example:
+
+    (elx-version-canonical (version-to-list \"1rc1\"))
+      => \"1rc1\"
+
+    (elx-version-canonical (version-to-list \"1pre1\"))
+      => \"1rc1\""
+  (unless (listp version)
+    (error "VERSION must be an integer list"))
+  (let ((result (mapconcat '(lambda (part)
+                              (if (>= part 0)
+                                  (number-to-string part)
+                                (format "_%s_" (cdr (assq part elx-version-canonical-mapping)))))
+                           version ".")))
+    ;; This is an ugly hack, but it is an easy way of preventing (1 -1 1) from
+    ;; becoming "1.rc.1", which `version-to-list' cannot parse.
+    (replace-regexp-in-string "_\\.\\|\\._" "" result)))
+
 (defun elx-version--do-standardize (version)
   "Standardize common version names such as \"alpha\" or \"v1.0\".
 
@@ -758,7 +827,8 @@ The return value has the form (NAME . ADDRESS)."
 	(car (elx-authors))))))
 
 (defun elx-adapted-by (&optional file sanitize)
-  "Return the person how adapted file FILE.
+  "Return the person who adapted FILE.
+
 Or the current buffer if FILE is equal to `buffer-file-name' or is nil.
 The return value has the form (NAME . ADDRESS)."
   (elx-with-file file
@@ -1142,10 +1212,11 @@ actually exists."
 If MAINFILE is non-nil use that as mainfile otherwise determine the
 mainfile by applying `elx-package-mainfile' to SOURCE.
 
-SOURCE has to be the mainfile itself (in which case it doesn't make much
-sense to specify MAINFILE also) or a directory containing a package
-consisting of one or more Emacs Lisp files.  This directory may also
-contain auxiliary files.
+SOURCE has to be the mainfile itself (in which case it doesn't
+make much sense to specify MAINFILE also) or a directory
+containing a package consisting of one or more Emacs Lisp files.
+This directory may also contain auxiliary files. If SOURCE is a
+buffer, then use that as the mainfile.
 
 If library `lgit' is loaded SOURCE can also be a cons cell whose car is
 the path to a git repository (which may be bare) and whose cdr has to be
@@ -1154,12 +1225,14 @@ an existing revision in that repository."
   `(let ((source ,source)
 	 (mainfile ,mainfile))
      (unless mainfile
-       (setq mainfile
-	     (if (file-directory-p (if (consp source)
-				       (car source)
-				     source))
-		 (elx-package-mainfile source t)
-	       source)))
+       (let* ((source-string (or (car-safe source) source)))
+         (setq mainfile
+               (cond
+                ((and (stringp source-string) (file-directory-p source-string))
+                 (elx-package-mainfile source t))
+                ((bufferp (get-buffer source))
+                 (buffer-file-name source))
+                (t source)))))
      (if mainfile
 	 (unless (or (consp source)
 		     (file-name-absolute-p mainfile))
@@ -1176,29 +1249,48 @@ an existing revision in that repository."
 (defun elx--git-get (repo variable)
   (mapcan #'split-string (cdr (lgit repo 1 "config --get-all %s" variable))))
 
-(defun elx-package-features (name repo rev &optional only-features)
-  (let (required required-hard required-soft
-	provided provided-repo bundled
-	(exclude (mapcar #'intern (elx--git-get repo "elm.exclude")))
-	(exclude-path (elx--git-get repo "elm.exclude-path")))
+;; TODO: Remove NAME from arguments, elx should not be dealing with packages.
+(defun elx-package-features (name source &optional only-features)
+  "Get the required and provided features of package NAME from SOURCE.
+
+NAME is the name of the package being examined, and SOURCE is the
+source from which to find the features. It has the same form as
+the SOURCE argument to `elx-elisp-files', although it may also be
+the file name of a single file."
+  (let (repo rev required required-hard required-soft
+                 provided provided-repo bundled
+                 git-src exclude exclude-path files)
+    (when (consp source)
+      (setq repo (car source)
+            rev (cdr source)
+            git-src (cons repo rev)
+            exclude (mapcar #'intern (elx--git-get repo "elm.exclude"))
+            exclude-path (elx--git-get repo "elm.exclude-path")))
+
     ;; Collect features.
-    (dolist (file (elx-elisp-files (cons repo rev)))
-      (lgit-with-file repo rev file
-	(setq provided (elx--buffer-provided)
-	      required (elx--buffer-required)))
+    (setq files
+          (if (or (and (stringp source) (file-directory-p source)) git-src)
+              (elx-elisp-files source t)
+            (list source)))
+    (dolist (file files)
+      (elx-with-file (if git-src
+                         (cons file git-src)
+                       file)
+                     (setq provided (elx--buffer-provided)
+                           required (elx--buffer-required)))
       (dolist (prov provided)
-	(cond ((or (member  prov exclude)
-		   (member* file exclude-path
-			    :test (lambda (file path)
-				    (string-match path file))))
-	       (push prov bundled))
-	      (t
-	       (when prov
-		 (push prov provided-repo))
-	       (setq required-hard
-		     (nconc (copy-list (nth 0 required)) required-hard))
-	       (setq required-soft
-		     (nconc (copy-list (nth 1 required)) required-soft))))))
+        (cond ((or (member  prov exclude)
+                   (member* file exclude-path
+                            :test (lambda (file path)
+                                    (string-match path file))))
+               (push prov bundled))
+              (t
+               (when prov
+                 (push prov provided-repo))
+               (setq required-hard
+                     (nconc (copy-list (nth 0 required)) required-hard))
+               (setq required-soft
+                     (nconc (copy-list (nth 1 required)) required-soft))))))
     ;; Add provides to `elx-features-provided', check for conflicts.
     (dolist (prov provided-repo)
       (let ((elt (assoc prov elx-features-provided)))
@@ -1212,27 +1304,32 @@ an existing revision in that repository."
     ;; Cleanup features.  (sort, remove dups, remove xemacs specific deps)
     (setq provided-repo (elx--sanitize-provided   provided-repo t))
     (setq required-hard (elx--sanitize-required-1 required-hard
-						  provided-repo t))
+                                                  provided-repo t))
     (setq required-soft (elx--sanitize-required-1 required-soft
-						  (append provided-repo
-							  required-hard) t))
-    ;; Get packages providing dependecies.
+                                                  (append provided-repo
+                                                          required-hard) t))
+    ;; Get packages providing dependencies.
     (unless only-features
       (setq required-hard (elx--lookup-required required-hard))
       (setq required-soft (elx--lookup-required required-soft))
       ;; Report missing
       (dolist (dep (cdr (assoc nil required-hard)))
-	(unless (memq dep bundled)
-	  (message "%s: hard required %s not available" name dep)))
+        (unless (memq dep bundled)
+          (message "%s: hard required %s not available" name dep)))
       (dolist (dep (cdr (assoc nil required-soft)))
-	(unless (memq dep bundled)
-	  (message "%s: soft required %s not available" name dep))))
+        (unless (memq dep bundled)
+          (message "%s: soft required %s not available" name dep))))
     ;; Return features.
     (list provided-repo required-hard required-soft)))
 
-(defun elx-package-metadata (name repo rev &optional branch)
-  (let ((features (elx-package-features name repo rev)))
-    (elx-with-mainfile (cons repo rev) nil
+;; TODO: Remove NAME argument, it shouldn't be handled by elx.
+(defun elx-package-metadata (name source &optional branch)
+  ;; Has to be something other than `features' because of dynamic scope!
+  (let ((elx-features (elx-package-features name source))
+        (repo (car-safe source))
+        (rev (cdr-safe source)))
+
+    (elx-with-mainfile source nil
       (let ((wikipage (elx-wikipage mainfile name nil t)))
 	(list :summary (elx-summary nil t)
 	      :created (elx-created)
@@ -1241,10 +1338,10 @@ an existing revision in that repository."
 	      :authors (elx-authors nil t)
 	      :maintainer (elx-maintainer nil t)
 	      :adapted-by (elx-adapted-by nil t)
-	      :provided (car features)
-	      :required (unless (equal (cdr features) '(nil nil))
-			  (if (equal (cddr features) '(nil))
-			      (list (cadr features))
+	      :provided (car elx-features)
+	      :required (unless (equal (cdr elx-features) '(nil nil))
+			  (if (equal (cddr elx-features) '(nil))
+			      (list (cadr elx-features))
 			    (cdr features)))
 	      :keywords (elx-keywords mainfile t)
 	      :homepage (or (elx-homepage)
