@@ -1345,8 +1345,9 @@ the file name of a single file."
 			    (cdr features)))
 	      :keywords (elx-keywords mainfile t)
 	      :homepage (or (elx-homepage)
-			    (cadr (lgit repo 1 "config branch.%s.elm-webpage"
-					(or branch rev)))
+                        (when repo
+                          (cadr (lgit repo 1 "config branch.%s.elm-webpage"
+                             (or branch rev))))
 			    (when (equal (or branch rev) "emacswiki")
 			      wikipage))
 	      :wikipage wikipage
