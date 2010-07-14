@@ -479,11 +479,13 @@ captures) 4 digits, then 2 digits, then 2 digits.")
 	       (string-match "[\"<]\\([-0-9]+\\)[\s\t].+[\">]" value))
       (match-string 1 value))))
 
-(defun elx-date-parse (date)
+(defun* elx-date-parse (date)
   "Parse DATE to the format returned from `decode-time'.
 
 If date seems to be in YYYYMMDD format, try converting that to
 YYYY-MM-DD before handing it off to `parse-time-string'."
+  (unless (stringp date)
+    (return-from elx-date-parse nil))
   (save-match-data
     (when (string-match elx-date-yyyymmdd-format date)
       (setq date (mapconcat (lambda (pos)
