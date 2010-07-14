@@ -724,26 +724,21 @@ aggressive approches and more aggressive doc-strings."
         (append old-version '(1))
       try-version)))
 
-(defun elx-version-internal (file &optional standardize)
+(defun elx-version-internal (file)
   "Return the version string of the file FILE.
 Or the current buffer if FILE is equal to `buffer-file-name'.
 
-Only use this for files that are distributed with GNU Emacs otherwise use
-function `elx-version'.
+Only use this for files that are distributed with GNU Emacs
+otherwise use function `elx-version'.
 
-If optional STANDARDIZE is non-nil verify and possibly convert the version
-using function `elx-version--do-standardize' (which see).
-
-If the file defines a version extract it using function `elx-version' and
-if that fails using function `elx-version--variable'.  If that fails return
-the value of variable `emacs-version'."
-  (or (elx-version file t)
-      (let ((version (elx-version--variable file)))
-	(elx-version--do-verify
-	 (if (and version standardize)
-	     (elx-version--do-standardize version)
-	   version)))
-      emacs-version))
+If the file defines a version extract it using function
+`elx-version' and if that fails using function
+`elx-version--variable'. If that fails return the value of
+variable `emacs-version'."
+  (version-to-list
+   (or (elx-version file)
+       (elx-version--variable file)
+       emacs-version)))
 
 (defun elx-version-internal> (file old-version &optional standardize)
   (elx-version--greater (elx-version-internal file standardize) old-version))
