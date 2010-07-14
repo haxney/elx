@@ -578,40 +578,6 @@ same canonical string. For example:
     ;; becoming "1.rc.1", which `version-to-list' cannot parse.
     (replace-regexp-in-string "_\\.\\|\\._" "" result)))
 
-(defun elx-version--do-standardize (version)
-  "Standardize common version names such as \"alpha\" or \"v1.0\".
-
-Changes the VERSION name to a more standard form, hopefully removing
-discrepancies between version formats. Many libraries use different
-conventions for naming their versions, and this is an attempt to
-reconcile those varying conventions.
-
-Some examples of the conversion are:
-
-  - \"0.1alpha\" => \"0.1_alpha\"
-  - \"v1.0\" => \"1.0\"
-  - \"v1.2.3rc3\" => \"1.2.3_rc3\""
-  (mapc (lambda (elt)
-	  (setq version (replace-regexp-in-string
-			 (car elt) (cdr elt) version t t 1)))
-	'(("[^_]\\(alpha\\)\\([0-9]+\\)?$" . "_alpha")
-	  ("[^_]\\(beta\\)\\([0-9]+\\)?$" . "_beta")
-	  ("[^_]\\(pre\\)\\([0-9]+\\)?$" . "_pre")
-	  ("[^_]\\(rc\\)\\([0-9]+\\)?$" . "_rc")
-	  ("\\(^[vV]\\)\\.?" . "")))
-  (elx-version--do-verify version))
-
-(defun elx-version-p (version)
-  "Use `version-to-list' to check whether VERSION is a valid version string."
-  (condition-case nil
-      (version-to-list version)
-    (error nil)))
-
-(defun elx-version--do-verify (version)
-  (if (elx-version-p version)
-      version
-    (dconv-convert-date version)))
-
 (defun elx-version--greater (version old-version)
   "Ensure VERSION is greater than OLD-VERSION, incrementing if necessary.
 
