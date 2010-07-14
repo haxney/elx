@@ -448,6 +448,12 @@ If no matching entry exists return nil."
 
 ;;; Extract Dates.
 
+(defconst elx-date-yyyymmdd-format "^\\([[:digit:]]\\{4\\}\\)\\([[:digit:]]\\{2\\}\\)\\([[:digit:]]\\{2\\}\\)$"
+  "A regular expression for matching YYYYMMDD dates.
+
+It looks a lot more complicated than it is. It just matches (and
+captures) 4 digits, then 2 digits, then 2 digits.")
+
 (defun elx-date--id-header (&optional file)
   (elx-with-file file
     (when (re-search-forward "\\$[I]d: [^ ]+ [^ ]+ \\([^ ]+\\)"
@@ -473,6 +479,19 @@ If no matching entry exists return nil."
     (when (and value
 	       (string-match "[\"<]\\([-0-9]+\\)[\s\t].+[\">]" value))
       (match-string 1 value))))
+
+(defun elx-date-parse (date)
+  "Parse DATE to the format returned from `decode-time'.
+
+If date seems to be in YYYYMMDD format, try converting that to
+YYYY-MM-DD before handing it off to `parse-time-string'."
+  (save-match-data
+    (when (string-match elx-date-yyyymmdd-format date)
+      (setq date (mapconcat (lambda (pos)
+                              (match-string pos date))
+                            '(1 2 3)
+                            "-"))))
+  (parse-time-string date))
 
 (defun elx-updated (&optional file)
   (elx-with-file file
