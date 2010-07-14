@@ -610,10 +610,9 @@ This is a list of the form (REGEXP . REP), to be passed to
   "Clean up a VERSION, stripping extraneous text.
 
 If VERSION passes all of the checks, return it unmodified."
-  ;; TODO: Make this into a list of regexps against which to match.
   (dolist (filter elx-version-sanitize-regexps)
     (setq version (replace-regexp-in-string
-		   (car filter) (cdr filter) version)))
+                   (car filter) (cdr filter) version)))
   version)
 
 (defun elx-version (file)
