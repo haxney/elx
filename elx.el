@@ -1291,7 +1291,8 @@ the file name of a single file."
 
     (elx-with-mainfile source nil
       (let ((wikipage (elx-wikipage mainfile name nil t)))
-	(list :summary (elx-summary nil t)
+	(list :version (elx-version (current-buffer))
+          :summary (elx-summary nil t)
 	      :created (elx-created)
 	      :updated (elx-updated)
 	      :license (elx-license)
