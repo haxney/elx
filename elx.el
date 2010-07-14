@@ -613,22 +613,22 @@ Some examples of the conversion are:
     (dconv-convert-date version)))
 
 (defun elx-version--greater (version old-version)
+  "Ensure VERSION is greater than OLD-VERSION, incrementing if necessary.
+
+If VERSION is smaller than OLD-VERSION, according to
+`version-list-<', then an error is signaled. If VERSION is
+greater, return it. Otherwise, if they are equal, append a 1 on
+the end and return that.
+
+This guarantees that the value returned is greater than or equal
+to VERSION and greater than OLD-VERSION."
   (when (and version old-version
-	     (vcomp-compare version old-version #'<))
+             (version-list-< version old-version))
     (error "New version is smaller than old version: %s %s"
-	   version old-version))
-  (elx-version--do-verify
-   (if version
-       (if (equal version old-version)
-	   (if (string-match "[^a-z][a-z]$" old-version)
-	       (concat (substring old-version 0 -1)
-		       (char-to-string (1+ (string-to-char
-					    (substring old-version -1)))))
-	     (concat old-version "a"))
-	 version)
-     (if old-version
-	 (number-to-string (1+ (string-to-number old-version)))
-       "0001"))))
+           version old-version))
+  (if (version-list-= version old-version)
+      (append old-version '(1))
+    version))
 
 (defvar elx-version-sanitize-regexps
   '(("\\$[Ii]d: [^ ]+ \\([^ ]+\\) " . "\\1")
@@ -720,12 +720,10 @@ aggressive approches and more aggressive doc-strings."
                          (elx-updated file))))
     (when (version-list-< try-version old-version)
       (error "Expected old version %s to be smaller than %s" old-version try-version))
-    (if (version-list-= try-version old-version)
-        (append old-version '(1))
-      try-version)))
+    (elx-version--greater try-version old-version)))
 
 (defun elx-version-internal (file)
-  "Return the version string of the file FILE.
+  "Return the version list of FILE.
 Or the current buffer if FILE is equal to `buffer-file-name'.
 
 Only use this for files that are distributed with GNU Emacs
@@ -740,8 +738,12 @@ variable `emacs-version'."
        (elx-version--variable file)
        emacs-version)))
 
-(defun elx-version-internal> (file old-version &optional standardize)
-  (elx-version--greater (elx-version-internal file standardize) old-version))
+(defun elx-version-internal> (file &optional old-version)
+  "Return a version for FILE, for internal Emacs packages.
+
+Uses `elx-version--greater' with `elx-version-internal' as the
+new version. See those functions for details."
+  (elx-version--greater (elx-version-internal file) old-version))
 
 ;;; Extract People.
 
