@@ -650,17 +650,6 @@ If VERSION passes all of the checks, return it unmodified."
 		   (car filter) (cdr filter) version)))
   version)
 
-;; Tempory function until `elx-version' and friends
-;; have been fixed and tested some more.
-(defun elx-version* (file)
-  (elx-with-file file
-    (let ((version (elx-header "version"))
-	  (update (elx-header "update\\( #\\)?")))
-      (when update
-	(setq version (concat (or version "0") "." update)))
-      (when (and version (elx-version-p version))
-	(vcomp-normalize version)))))
-
 (defun elx-version (file)
   "Return the version list of file FILE.
 Or the current buffer if FILE is equal to `buffer-file-name'.
