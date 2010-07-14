@@ -53,7 +53,6 @@
 ;;; Code:
 
 (require 'cl)
-(require 'dconv)
 (require 'lisp-mnt)
 (require 'lgit nil t)
 
@@ -494,18 +493,30 @@ YYYY-MM-DD before handing it off to `parse-time-string'."
   (parse-time-string date))
 
 (defun elx-updated (&optional file)
+  "Try to extract the update time of FILE.
+
+If FILE is nil, use the current buffer.
+
+Tries a few different methods and runs the result through
+`elx-date-parse'."
   (elx-with-file file
-    (or (dconv-convert-date (elx-header "\\(last-\\)?updated"))
-	(dconv-convert-date (elx-header "modified"))
-	(dconv-convert-date (elx-header "\\$date"))
-	(dconv-convert-date (elx-date--id-header))
-	(dconv-convert-date (elx-date--time-stamp-header))
-	(dconv-convert-date (elx-date--last-copyright)))))
+    (or (elx-date-parse (elx-header "\\(last-\\)?updated"))
+        (elx-date-parse (elx-header "modified"))
+        (elx-date-parse (elx-header "\\$date"))
+        (elx-date-parse (elx-date--id-header))
+        (elx-date-parse (elx-date--time-stamp-header))
+        (elx-date-parse (elx-date--last-copyright)))))
 
 (defun elx-created (&optional file)
+  "Try to extract the creation time of FILE.
+
+If FILE is nil, use the current buffer.
+
+Tries a few different methods and runs the result through
+`elx-date-parse'."
   (elx-with-file file
-    (or (dconv-convert-date (lm-creation-date))
-	(dconv-convert-date (elx-date--first-copyright)))))
+    (or (elx-date-parse (lm-creation-date))
+        (elx-date-parse (elx-date--first-copyright)))))
 
 ;;; Extract Version.
 
